@@ -1,5 +1,5 @@
 
-namespace api.Models
+namespace api.Entities
 {
     /// <summary>
     /// Represents a single episode of Rick and Morty.
