@@ -1,27 +1,42 @@
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
+using Microsoft.EntityFrameworkCore;
 
 namespace api.Models
 {
 
-    public enum UploadStatus
+    /// <summary>
+    /// Status of the upload process
+    /// </summary>
+    public enum ProcessingStatus
     {
         Pending,
         InProgress,
         Completed,
         Failed
     }
-
-    public class UploadHistory
+/// <summary>
+/// Represents the history of a file upload.
+/// </summary>
+    [Index(nameof(CreatedTimestamp))]
+    public sealed class UploadHistory
     {
-        [Key]
-        public int Id { get; set; }
+        [Key] public Guid Id { get; set; }
+
         [Required, MaxLength(255)]
-        public string FilePath { get; set; }
-        public DateTime? CreatedTimestamp { get; set; }
+        public string OriginalFileName { get; set; } = default!;
+
+        [Required, MaxLength(1024)]
+        public string FilePath { get; set; } = default!;
+
+        public DateTime CreatedTimestamp { get; set; } = DateTime.UtcNow;
+        public DateTime? StartedAt { get; set; }
+        public DateTime? FinishedAt { get; set; }
+
+        [Required] public ProcessingStatus Status { get; set; } = ProcessingStatus.Pending;
+
+        /// <summary>
+        /// Which episodes were requested by this upload
+        /// </summary>
+        public ICollection<UploadEpisode> UploadEpisodes { get; set; } = new List<UploadEpisode>();
     }
 }
