@@ -1,6 +1,7 @@
 
 using api.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Build.Framework;
 
 namespace api.Controllers;
 
@@ -29,7 +30,7 @@ public class UploadHistoryController : ControllerBase
     /// <summary>
     /// Get a specific upload by its ID.
     /// </summary>
-    [HttpGet("{idz:int}")]
+    [HttpGet("{id:int}")]
     public IActionResult GetUploadById([FromRoute] int id)
     {
         var upload = _context.Uploads.Find(id);
@@ -65,24 +66,35 @@ public class UploadHistoryController : ControllerBase
 
         // Save the file to the server
         DateTime createdTimestamp = DateTime.UtcNow;
+        DateTime started;
+        DateTime finished;
         string newFileName = $"{createdTimestamp:yyyyMMdd_HHmmss}_{Guid.NewGuid()}.csv";
         string filePath = Path.Combine(uploadsDir, newFileName);
         using (var stream = new FileStream(filePath, FileMode.Create))
         {
+            started = DateTime.UtcNow;
             await file.CopyToAsync(stream);
+            finished = DateTime.UtcNow;
         }
         var uploadRecord = new Entities.UploadHistory
         {
             FilePath = filePath,
             CreatedTimestamp = createdTimestamp,
             Status = Entities.ProcessingStatus.Pending,
-            StartedAt = DateTime.UtcNow
+            StartedAt = started,
+            FinishedAt = finished
 
         };
 
         _context.Uploads.Add(uploadRecord);
         await _context.SaveChangesAsync();
 
-        return Ok();
+        var statusUrl = Url.ActionLink(
+            action: nameof(GetUploadById),
+            controller: "UploadHistory",
+            values: new { id = uploadRecord.Id }
+        );
+
+        return Ok(new { statusUrl });
     }
 }
