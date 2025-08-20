@@ -23,5 +23,5 @@ public sealed class EnrichedArchiveDto
     public int totalGenderUnknownCharacters { get; init; }
 
     [JsonPropertyName("uploadedFilePath")]
-    public string UploadedFilePath { get; init; } = string.Empty;
+    public string UploadedFilePath { get; init; } = string.Empty;   
 }
