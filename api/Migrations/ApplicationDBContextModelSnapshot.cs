@@ -139,20 +139,15 @@ namespace api.Migrations
 
             modelBuilder.Entity("api.Entities.UploadEpisode", b =>
                 {
-                    b.Property<Guid>("UploadId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("EpisodeId")
+                    b.Property<int>("UploadId")
                         .HasColumnType("int");
 
-                    b.Property<int>("UploadId1")
+                    b.Property<int>("EpisodeId")
                         .HasColumnType("int");
 
                     b.HasKey("UploadId", "EpisodeId");
 
                     b.HasIndex("EpisodeId");
-
-                    b.HasIndex("UploadId1");
 
                     b.ToTable("UploadEpisodes", (string)null);
                 });
@@ -239,7 +234,7 @@ namespace api.Migrations
 
                     b.HasOne("api.Entities.UploadHistory", "Upload")
                         .WithMany("UploadEpisodes")
-                        .HasForeignKey("UploadId1")
+                        .HasForeignKey("UploadId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

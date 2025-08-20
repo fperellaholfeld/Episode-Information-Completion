@@ -93,9 +93,8 @@ namespace api.Migrations
                 name: "UploadEpisodes",
                 columns: table => new
                 {
-                    UploadId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    EpisodeId = table.Column<int>(type: "int", nullable: false),
-                    UploadId1 = table.Column<int>(type: "int", nullable: false)
+                    UploadId = table.Column<int>(type: "int", nullable: false),
+                    EpisodeId = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -107,8 +106,8 @@ namespace api.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_UploadEpisodes_Uploads_UploadId1",
-                        column: x => x.UploadId1,
+                        name: "FK_UploadEpisodes_Uploads_UploadId",
+                        column: x => x.UploadId,
                         principalTable: "Uploads",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
@@ -162,11 +161,6 @@ namespace api.Migrations
                 name: "IX_UploadEpisodes_EpisodeId",
                 table: "UploadEpisodes",
                 column: "EpisodeId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_UploadEpisodes_UploadId1",
-                table: "UploadEpisodes",
-                column: "UploadId1");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Uploads_CreatedTimestamp",

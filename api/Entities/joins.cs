@@ -18,7 +18,7 @@ namespace api.Entities
     /// </summary>
     public sealed class UploadEpisode
     {
-        public Guid UploadId { get; set; }
+        public int UploadId { get; set; }
         public UploadHistory Upload { get; set; } = default!;
 
         public int EpisodeId { get; set; }
