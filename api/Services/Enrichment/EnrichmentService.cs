@@ -53,7 +53,58 @@ public sealed class EnrichmentService : IEnrichmentService
             ? await _client.GetLocationsAsync(locIds)
             : new List<ApiLocation>();
 
-       
+        // Load Existing Entities
+        var existingEpisodes = await _context.Episodes.Where(e => eps.Contains(e.Id)).ToDictionaryAsync(e => e.Id);
+        var existingCharacters = await _context.Characters.Where(c => charIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id);
+        var existingLocations = await _context.Locations.Where(l => locIds.Contains(l.Id)).ToDictionaryAsync(l => l.Id);
+
+        // Upsert locations
+        foreach (var loc in apiLocs)
+        {
+            if (!existingLocations.TryGetValue(loc.Id, out var location))
+            {
+                location = new Location
+                {
+                    Id = loc.Id,
+                    Name = loc.Name
+                };
+                _context.Locations.Add(location);
+                existingLocations[loc.Id] = location;
+            }
+
+            location.Name = loc.Name;
+            location.Type = loc.Type;
+            location.Dimension = loc.Dimension;
+        }
+
+        await _context.SaveChangesAsync();
+
+        //upsert Episodes
+        foreach (var ep in apiEpisodes)
+        {
+            if (!existingEpisodes.TryGetValue(ep.Id, out var episode))
+            {
+                episode = new Episode
+                {
+                    Id = ep.Id,
+                    Name = ep.Name,
+                    AirDate = ep.AirDate,
+                    EpisodeCode = ep.EpisodeCode
+                };
+                _context.Episodes.Add(episode);
+                existingEpisodes[ep.Id] = episode;
+            }
+
+            episode.Name = ep.Name;
+            episode.AirDate = ep.AirDate;
+            episode.EpisodeCode = ep.EpisodeCode;
+
+            // relate to upload
+            if (!await _context.UploadEpisodes.AnyAsync(x => x.UploadId == uploadId && x.EpisodeId == episode.Id))
+            {
+                _context.UploadEpisodes.Add(new UploadEpisode { UploadId = uploadId, EpisodeId = episode.Id });
+            }
+        }
 
     }
 }
