@@ -50,10 +50,10 @@ public sealed class ApiCharacter
     public string Gender { get; init; } = string.Empty;
 
     [JsonPropertyName("origin")]
-    public ApiLocation Origin { get; init; } = new();
+    public ApiRef Origin { get; init; } = new();
 
     [JsonPropertyName("location")]
-    public ApiLocation Location { get; init; } = new();
+    public ApiRef Location { get; init; } = new();
 }
 
 public sealed class ApiLocation

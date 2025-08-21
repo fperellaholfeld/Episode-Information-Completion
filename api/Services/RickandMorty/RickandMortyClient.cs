@@ -87,4 +87,11 @@ public sealed class RickandMortyClient : IRickandMortyClient
         }
 
     }
+
+    public static int? ExtractIdFromUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+        var match = Regex.Match(url, @".*/(\d+)$");
+        return match.Success ? int.Parse(match.Groups[1].Value) : null;
+    }
 }
