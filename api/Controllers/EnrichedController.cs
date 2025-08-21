@@ -1,6 +1,8 @@
 using api.Data;
+using api.Dtos;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 namespace api.Controllers;
 
@@ -34,10 +36,8 @@ public sealed class EnrichedController : ControllerBase
         }
 
         //query episodes linked to the upload
-        var q = _context.UploadEpisodes
-            .Where(ue => ue.UploadId == uploadId)
-            .Select(ue => ue.Episode)
-            .AsQueryable();
+         var episodesBaseQuery = _context.Episodes
+        .Where(e => _context.UploadEpisodes.Any(ue => ue.UploadId == uploadId && ue.EpisodeId == e.Id));
 
         // Perform any necessary transformations or aggregations on the queryable
 
@@ -45,7 +45,7 @@ public sealed class EnrichedController : ControllerBase
         if (!string.IsNullOrWhiteSpace(search))
         {
             string term = $"%{search.Trim()}%";
-            q = q.Where(e =>
+            episodesBaseQuery = episodesBaseQuery.Where(e =>
                 EF.Functions.Like(e.Name, term) || // episode name
                 EF.Functions.Like(e.EpisodeCode, term) || // episode code
                 e.EpisodeCharacters.Any(ec => EF.Functions.Like(ec.Character.Name, term)) // character name
@@ -54,20 +54,96 @@ public sealed class EnrichedController : ControllerBase
 
         // Sorting
         (string sortBy, bool descending) = ParseSort(sort);
-        q = (sortBy, descending) switch
+        episodesBaseQuery = (sortBy, descending) switch
         {
-            ("name", true) => q.OrderByDescending(e => e.Name),
-            ("name", false) => q.OrderBy(e => e.Name),
-            ("air_date", true) => q.OrderByDescending(e => e.AirDate),
-            ("air_date", false) => q.OrderBy(e => e.AirDate),
-            ("episode", true) => q.OrderByDescending(e => e.EpisodeCode),
-            ("episode", false) => q.OrderBy(e => e.EpisodeCode),
-            ("id", true) => q.OrderByDescending(e => e.Id),
-            _ => q.OrderBy(e => e.Id)
+            ("name", true) => episodesBaseQuery.OrderByDescending(e => e.Name),
+            ("name", false) => episodesBaseQuery.OrderBy(e => e.Name),
+            ("air_date", true) => episodesBaseQuery.OrderByDescending(e => e.AirDate),
+            ("air_date", false) => episodesBaseQuery.OrderBy(e => e.AirDate),
+            ("episode", true) => episodesBaseQuery.OrderByDescending(e => e.EpisodeCode),
+            ("episode", false) => episodesBaseQuery.OrderBy(e => e.EpisodeCode),
+            ("id", true) => episodesBaseQuery.OrderByDescending(e => e.Id),
+            _ => episodesBaseQuery.OrderBy(e => e.Id)
+        };
+
+        // Set pagination limits and offset
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize is < 1 or > 200 ? 20 : pageSize;
+        int skip = (page - 1) * pageSize;
+
+        // Materialize the paged episodes with their characters and locations
+        var episodes = await episodesBaseQuery
+            .Include(e => e.EpisodeCharacters)
+                .ThenInclude(ec => ec.Character)
+                    .ThenInclude(c => c.Origin)
+            .Include(e => e.EpisodeCharacters)
+                .ThenInclude(ec => ec.Character)
+                    .ThenInclude(c => c.Location)
+            .AsSplitQuery()
+            .AsNoTracking()
+            .Skip(skip)
+            .Take(pageSize)
+            .ToListAsync();
+
+        // Project to the schema shape
+        var episodeDtos = episodes.Select(e => new Dtos.EpisodeDto
+        {
+            Id = e.Id,
+            Name = e.Name,
+            AirDate = e.AirDate,
+            Episode = e.EpisodeCode,
+            Characters = e.EpisodeCharacters
+                .Select(ec => ec.Character)
+                .DistinctBy(c => c.Id)
+                .Select(c => new Dtos.CharacterDto
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+                    Status = c.Status,
+                    Species = c.Species,
+                    Type = c.Type,
+                    Gender = c.Gender,
+                    Origin = new Dtos.LocationDto
+                    {
+                        Id = c.Origin.Id,
+                        Name = c.Origin.Name,
+                        Type = c.Origin.Type,
+                        Dimension = c.Origin.Dimension
+                    },
+                    Location = new Dtos.LocationDto
+                    {
+                        Id = c.Location.Id,
+                        Name = c.Location.Name,
+                        Type = c.Location.Type,
+                        Dimension = c.Location.Dimension
+                    }
+                }).ToList()
+        }).ToList();
+
+        // TODO: See if this should be done by page or entire upload query
+        var distinctCharacters = episodes.SelectMany(e => e.EpisodeCharacters.Select(ec => ec.Character))
+            .GroupBy(c => c.Id)
+            .Select(g => g.First())
+            .ToList();
+
+        int totalLocations = distinctCharacters
+            .SelectMany(c => new[] { c.OriginLocationId, c.LocationId })
+            .Distinct()
+            .Count();
+
+        var response = new EnrichedArchiveDto
+        {
+            Episodes = episodeDtos,
+            TotalLocations = totalLocations,
+            TotalFemaleCharacters = distinctCharacters.Count(c => c.Gender == "Female"),
+            TotalMaleCharacters = distinctCharacters.Count(c => c.Gender == "Male"),
+            TotalGenderlessCharacters = distinctCharacters.Count(c => c.Gender == "Genderless"),
+            TotalGenderUnknownCharacters = distinctCharacters.Count(c => c.Gender == "unknown"),
+            UploadedFilePath = upload.FilePath
         };
 
         // For now, just return a message indicating success
-        return Ok(new { message = $"Enriched archive for upload ID {uploadId} is being generated." });
+        return Ok(response);
     }
 
     private static (string sortBy, bool descending) ParseSort(string? sort)
