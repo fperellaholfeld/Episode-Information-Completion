@@ -9,9 +9,9 @@ namespace api.Controllers;
 [ApiController]
 public sealed class EnrichedController : ControllerBase
 {
-    private readonly ApplicationDBContext _context;
+    private readonly ApplicationDbContext _context;
 
-    public EnrichedController(ApplicationDBContext context)
+    public EnrichedController(ApplicationDbContext context)
     {
         _context = context;
     }

@@ -8,9 +8,9 @@ namespace api.Controllers;
 [ApiController]
 public class UploadHistoryController : ControllerBase
 {
-    private readonly ApplicationDBContext _context;
+    private readonly ApplicationDbContext _context;
     private readonly IWebHostEnvironment _env;
-    public UploadHistoryController(ApplicationDBContext context, IWebHostEnvironment env)
+    public UploadHistoryController(ApplicationDbContext context, IWebHostEnvironment env)
     {
         _context = context;
         _env = env;
