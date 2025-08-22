@@ -1,14 +1,13 @@
 using api.Data;
+using api.Services;
+using api.Services.Background;
 using api.Services.Enrichment;
 using api.Services.RickandMorty;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddHttpClient<IRickandMortyClient, RickandMortyClient>(client =>
-{
-    client.BaseAddress = new Uri("https://rickandmortyapi.com/api/");
-    client.Timeout = TimeSpan.FromSeconds(30);
-});
+
+
 
 // Add services to the container.
 builder.Services.AddScoped<IEnrichmentService, EnrichmentService>();
@@ -16,6 +15,16 @@ builder.Services.AddScoped<IEnrichmentService, EnrichmentService>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddSingleton<IJobQueue>(new InMemoryJobQueue(capacity: 100));
+builder.Services.AddHostedService<UploadProcessingService>();
+builder.Services.AddScoped<IEnrichmentService, EnrichmentService>();
+builder.Services.AddHttpClient<IRickandMortyClient, RickandMortyClient>(client =>
+{
+    client.BaseAddress = new Uri("https://rickandmortyapi.com/api/");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
