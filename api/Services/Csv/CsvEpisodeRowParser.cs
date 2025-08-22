@@ -2,9 +2,6 @@
 using CsvHelper;
 using CsvHelper.Configuration;
 using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Threading;
 
 namespace api.Services.Csv;
 
@@ -59,7 +56,7 @@ public static class CsvEpisodeRowParser
             }
             catch
             {
-                // Skip malformed line; could log if needed
+                
             }
         }
 

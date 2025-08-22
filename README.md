@@ -6,9 +6,14 @@ THis project involves ingesting a .CSV file and finding its related information 
 ## Running this project
 Ensure you have all the dependencies installed
 
-create the DB and server with
+create the MSSQL server with
 ```
 docker-compose up
+```
+
+Populate the DB using
+```
+dotnet ef database update
 ```
 
 To test endpoints, run

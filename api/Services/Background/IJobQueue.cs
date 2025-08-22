@@ -5,7 +5,6 @@ namespace api.Services.Background;
 /// <summary>
 /// Represents a command to process an uploaded file.
 /// </summary>
-
 public readonly record struct ProcessUploadCommand(int UploadId, string FilePath);
 
 /// <summary>
