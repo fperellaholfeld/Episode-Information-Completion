@@ -63,8 +63,8 @@ public sealed class UploadProcessingService : BackgroundService
                 return;
             }
 
-            // Parse CSV RRows
-            var rows = await CsvEpisodeRowParser.ParseAsync(command.FilePath);
+            // Parse CSV Rows
+            var rows = await CsvEpisodeRowParser.ParseAsync(command.FilePath, ct);
             _log.LogInformation("Parsed {RowCount} rows from CSV file at {FilePath}.", rows.Count, command.FilePath);
 
             //Enrich and persist to DB

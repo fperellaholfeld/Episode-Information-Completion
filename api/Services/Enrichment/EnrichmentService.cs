@@ -1,13 +1,14 @@
 using api.Data;
 using api.Entities;
 using api.Services.RickandMorty;
+using api.Services.Csv;
 using Microsoft.EntityFrameworkCore;
 
 namespace api.Services.Enrichment;
 
 public interface IEnrichmentService
 {
-    Task EnrichUploadAsync(int uploadId, IEnumerable<int> episodeIds);
+    Task EnrichUploadAsync(int uploadId, List<CsvRow> rows);
 }
 public sealed class EnrichmentService : IEnrichmentService
 {
@@ -22,33 +23,45 @@ public sealed class EnrichmentService : IEnrichmentService
         _logger = logger;
     }
 
-    public async Task EnrichUploadAsync(int uploadId, IEnumerable<int> episodeIds)
+    public async Task EnrichUploadAsync(int uploadId, List<CsvRow> rows)
     {
-        var eps = episodeIds.Distinct().ToArray();
-        if (eps.Length == 0) return;
+        if (rows.Count == 0) return;
+
+    var episodeIds = rows.Select(r => r.EpisodeId).Where(id => id > 0).Distinct().ToArray();
+    var characterIdsCsv = rows.Select(r => r.CharacterId).Where(id => id > 0).Distinct().ToArray();
+    var locationIdsCsv = rows.Select(r => r.LocationId).Where(id => id > 0).Distinct().ToArray();
 
         // Fetch Episodes
-        var apiEpisodes = await _client.GetEpisodesAsync(eps);
+        var apiEpisodes = await _client.GetEpisodesAsync(episodeIds);
 
-        // Collect Character IDs and Fetch
-        var charIds = apiEpisodes
+        // Collect Character IDs from the episodes themselves
+        var charIdsFromEpisodes = apiEpisodes
             .SelectMany(e => e.CharacterUrls)
             .Select(RickandMortyClient.ExtractIdFromUrl)
             .Where(id => id.HasValue).Select(id => id!.Value)
             .Distinct()
             .ToArray();
+        
+        // Combine the ids to make sure we have full character coverage for an episode
+    var charIds = characterIdsCsv
+            .Union(charIdsFromEpisodes)
+            .Distinct()
+            .ToArray();
 
         var apiChars = charIds.Length > 0
             ? await _client.GetCharactersAsync(charIds)
-            : new List<ApiCharacter>();
+            : new();
 
-        // Collect the Location IDs from each character and fetch the locations
-        var locIds = apiChars
+        // Collect the Location IDs from each character and unite with the character in the csv
+        var locIdsFromChars = apiChars
             .SelectMany(c => new[] { RickandMortyClient.ExtractIdFromUrl(c.Origin.Url), RickandMortyClient.ExtractIdFromUrl(c.Location.Url) })
             .Where(id => id.HasValue).Select(id => id!.Value)
             .Distinct()
             .ToArray();
-
+    var locIds = locIdsFromChars
+            .Union(locationIdsCsv)
+            .Distinct()
+            .ToArray();
         var apiLocs = locIds.Length > 0
             ? await _client.GetLocationsAsync(locIds)
             : new List<ApiLocation>();
@@ -57,7 +70,7 @@ public sealed class EnrichmentService : IEnrichmentService
         using var tx = await _context.Database.BeginTransactionAsync();
 
         // Load Existing Entities
-        var existingEpisodes = await _context.Episodes.Where(e => eps.Contains(e.Id)).ToDictionaryAsync(e => e.Id);
+        var existingEpisodes = await _context.Episodes.Where(e => episodeIds.Contains(e.Id)).ToDictionaryAsync(e => e.Id);
         var existingCharacters = await _context.Characters.Where(c => charIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id);
         var existingLocations = await _context.Locations.Where(l => locIds.Contains(l.Id)).ToDictionaryAsync(l => l.Id);
 
@@ -119,7 +132,26 @@ public sealed class EnrichmentService : IEnrichmentService
             var originId = RickandMortyClient.ExtractIdFromUrl(c.Origin.Url) ?? -1;
             var locationId = RickandMortyClient.ExtractIdFromUrl(c.Location.Url) ?? -1;
 
-            if (!existingLocations.ContainsKey(originId) && originId != -1)
+            // Normalize unknown IDs to a shared placeholder location (ID = 0)
+            const int UnknownLocationId = 0;
+            if (originId == -1) originId = UnknownLocationId;
+            if (locationId == -1) locationId = UnknownLocationId;
+
+            // Ensure the unknown placeholder exists if needed
+            if ((originId == UnknownLocationId || locationId == UnknownLocationId) && !existingLocations.ContainsKey(UnknownLocationId))
+            {
+                var unknownLoc = new Location
+                {
+                    Id = UnknownLocationId,
+                    Name = "unknown",
+                    Type = "unknown",
+                    Dimension = "unknown"
+                };
+                _context.Locations.Add(unknownLoc);
+                existingLocations[UnknownLocationId] = unknownLoc;
+            }
+
+            if (!existingLocations.ContainsKey(originId) && originId != UnknownLocationId)
             {
                 _context.Locations.Add(new Location
                 {
@@ -130,7 +162,7 @@ public sealed class EnrichmentService : IEnrichmentService
                 });
                 existingLocations[originId] = await _context.Locations.FindAsync(originId) ?? new Location { Id = originId };
             }
-            if (!existingLocations.ContainsKey(locationId) && locationId != -1)
+            if (!existingLocations.ContainsKey(locationId) && locationId != UnknownLocationId)
             {
                 _context.Locations.Add(new Location
                 {

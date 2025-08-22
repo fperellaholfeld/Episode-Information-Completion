@@ -1,30 +1,70 @@
+// Services/Csv/CsvEpisodeRowParser.cs
 using CsvHelper;
 using CsvHelper.Configuration;
 using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Threading;
 
 namespace api.Services.Csv;
 
 public static class CsvEpisodeRowParser
 {
-    public static async Task<List<CsvRow>> ParseAsync(string path)
+    private static readonly string[] ExpectedHeaders = new[] { "episode_id", "character_id", "character_name", "location_id" };
+
+    public static async Task<List<CsvRow>> ParseAsync(string path, CancellationToken ct = default)
     {
-        using var reader = new StreamReader(path);
+        ct.ThrowIfCancellationRequested();
+        if (!File.Exists(path)) return new List<CsvRow>();
+
+        // Read entire file once (small CSV assumption). If large, refactor to streaming with seekable stream.
+        var allLines = await File.ReadAllLinesAsync(path, ct);
+        if (allLines.Length == 0) return new List<CsvRow>();
+
+        // Detect if first non-empty line is a header
+        var firstContentLine = allLines.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l)) ?? string.Empty;
+        var parts = firstContentLine.Split(',').Select(p => p.Trim().Trim('"').ToLowerInvariant()).ToArray();
+        bool hasHeader = parts.Intersect(ExpectedHeaders).Count() >= 2; // at least two matches to be confident
+
         var cfg = new CsvConfiguration(CultureInfo.InvariantCulture)
         {
-            Delimiter = ",",
-            HeaderValidated = null,
+            HasHeaderRecord = hasHeader,
             IgnoreBlankLines = true,
-            MissingFieldFound = null
+            BadDataFound = null,
+            MissingFieldFound = null,
+            HeaderValidated = null,
+            TrimOptions = TrimOptions.Trim,
+            PrepareHeaderForMatch = args => args.Header.ToLowerInvariant().Replace("_", "")
         };
+
+        // Normalize property names similarly (EpisodeId -> episodeid) so headers map.
+        using var reader = new StringReader(string.Join('\n', allLines));
         using var csv = new CsvReader(reader, cfg);
-        csv.Context.RegisterClassMap<CsvEpisodeRowMap>();
 
-        var rows = new List<CsvRow>();
-        await foreach (var record in csv.GetRecordsAsync<CsvRow>())
+        // If there is a header, read it so CsvHelper establishes field indexes.
+        var records = new List<CsvRow>();
+        if (hasHeader)
         {
-            rows.Add(record);
+            if (!await csv.ReadAsync()) return records; // only header present
+            csv.ReadHeader();
         }
-        return rows;
-    }
 
+        while (await csv.ReadAsync())
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                var record = csv.GetRecord<CsvRow>();
+                records.Add(record);
+            }
+            catch
+            {
+                // Skip malformed line; could log if needed
+            }
+        }
+
+        return records;
+    }
 }
+
+

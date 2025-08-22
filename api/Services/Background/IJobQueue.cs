@@ -1,5 +1,4 @@
 using System.Threading.Channels;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace api.Services.Background;
 

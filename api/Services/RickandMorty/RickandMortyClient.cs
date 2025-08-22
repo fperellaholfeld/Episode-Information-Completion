@@ -41,28 +41,49 @@ public sealed class RickandMortyClient : IRickandMortyClient
     /// <returns></returns>
     private async Task<List<T>> GetManyAsync<T>(string endpoint, IEnumerable<int> ids)
     {
+        var cleanIds = ids.Where(i => i > 0).Distinct().ToArray();
         var results = new List<T>();
-        foreach (var chunk in Chunk(ids, size: 20))
+        if (cleanIds.Length == 0) return results;
+
+        foreach (var chunk in Chunk(cleanIds, size: 20))
         {
-            string path = $"{endpoint}/({string.Join(",", chunk)})";
-            using var response = await _http.GetAsync(path);
-            response.EnsureSuccessStatusCode();
-
-            var json = await response.Content.ReadAsStringAsync();
-
-            // Return a single object when there is only 1 ID
-            if (json.TrimStart().StartsWith("["))
+            // Rick & Morty API expects /episode/1,2,3 (NO parentheses)
+            string path = $"{endpoint}/{string.Join(",", chunk)}";
+            HttpResponseMessage? response = null;
+            string? body = null;
+            try
             {
-                var arr = JsonSerializer.Deserialize<List<T>>(json, _jsonOptions) ?? new();
-                results.AddRange(arr);
-            }
-            else
-            {
-                var single = JsonSerializer.Deserialize<T>(json, _jsonOptions);
-                if (single is not null)
+                response = await _http.GetAsync(path);
+                if (!response.IsSuccessStatusCode)
                 {
-                    results.Add(single);
+                    body = await response.Content.ReadAsStringAsync();
+                    // 404 means some IDs not found; skip this chunk (could refine per ID)
+                    if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        continue;
+                    }
+                    throw new HttpRequestException($"RickAndMorty API call failed (status {(int)response.StatusCode}) for '{path}'. Body: {body}");
                 }
+
+                body = await response.Content.ReadAsStringAsync();
+                var trimmed = body.TrimStart();
+                if (trimmed.StartsWith("["))
+                {
+                    var arr = JsonSerializer.Deserialize<List<T>>(body, _jsonOptions) ?? new();
+                    results.AddRange(arr);
+                }
+                else
+                {
+                    var single = JsonSerializer.Deserialize<T>(body, _jsonOptions);
+                    if (single is not null)
+                    {
+                        results.Add(single);
+                    }
+                }
+            }
+            finally
+            {
+                response?.Dispose();
             }
         }
         return results;

@@ -1,4 +1,5 @@
 using CsvHelper.Configuration;
+using CsvHelper.Configuration.Attributes;
 
 namespace api.Services.Csv;
 
@@ -7,9 +8,13 @@ namespace api.Services.Csv;
 /// </summary>
 public sealed class CsvRow
 {
+    [Index(0)]
     public int EpisodeId { get; set; }
+    [Index(1)]
     public int CharacterId { get; set; }
+    [Index(2)]
     public string CharacterName { get; set; } = string.Empty;
+    [Index(3)]
     public int LocationId { get; set; }
 }
 
