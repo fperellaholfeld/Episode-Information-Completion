@@ -22,6 +22,7 @@ namespace api.Data
             // Configure the Episode entity
             mb.Entity<Episode>().ToTable("Episodes");
             mb.Entity<Episode>().HasKey(e => e.Id);
+            mb.Entity<Episode>().Property(e => e.Id).ValueGeneratedNever(); // External API supplies the ID
             mb.Entity<Episode>()
                 .Property(e => e.Name)
                 .IsRequired()
@@ -38,6 +39,7 @@ namespace api.Data
             //Configure the Character entity
             mb.Entity<Character>().ToTable("Characters");
             mb.Entity<Character>().HasKey(c => c.Id);
+            mb.Entity<Character>().Property(c => c.Id).ValueGeneratedNever(); // External API supplies the ID
             mb.Entity<Character>()
                 .Property(c => c.Name)
                 .IsRequired()
@@ -47,6 +49,7 @@ namespace api.Data
             //Configure the Location entity
             mb.Entity<Location>().ToTable("Locations");
             mb.Entity<Location>().HasKey(l => l.Id);
+            mb.Entity<Location>().Property(l => l.Id).ValueGeneratedNever(); // External API supplies the ID
             mb.Entity<Location>()
                 .Property(l => l.Name)
                 .IsRequired()
