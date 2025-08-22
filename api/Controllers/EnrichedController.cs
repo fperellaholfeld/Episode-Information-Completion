@@ -85,7 +85,7 @@ public sealed class EnrichedController : ControllerBase
             .ToListAsync();
 
         // Project to the schema shape
-        var episodeDtos = episodes.Select(e => new Dtos.EpisodeDto
+        var episodeDtos = episodes.Select(e => new EpisodeDto
         {
             Id = e.Id,
             Name = e.Name,
@@ -94,7 +94,7 @@ public sealed class EnrichedController : ControllerBase
             Characters = e.EpisodeCharacters
                 .Select(ec => ec.Character)
                 .DistinctBy(c => c.Id)
-                .Select(c => new Dtos.CharacterDto
+                .Select(c => new CharacterDto
                 {
                     Id = c.Id,
                     Name = c.Name,
@@ -102,14 +102,14 @@ public sealed class EnrichedController : ControllerBase
                     Species = c.Species,
                     Type = c.Type,
                     Gender = c.Gender,
-                    Origin = new Dtos.LocationDto
+                    Origin = new LocationDto
                     {
                         Id = c.Origin.Id,
                         Name = c.Origin.Name,
                         Type = c.Origin.Type,
                         Dimension = c.Origin.Dimension
                     },
-                    Location = new Dtos.LocationDto
+                    Location = new LocationDto
                     {
                         Id = c.Location.Id,
                         Name = c.Location.Name,
