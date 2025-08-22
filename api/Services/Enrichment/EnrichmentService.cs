@@ -129,57 +129,57 @@ public sealed class EnrichmentService : IEnrichmentService
 
         foreach (var c in apiChars)
         {
-            var originId = RickandMortyClient.ExtractIdFromUrl(c.Origin.Url) ?? -1;
-            var locationId = RickandMortyClient.ExtractIdFromUrl(c.Location.Url) ?? -1;
-
-            // Normalize unknown IDs to a shared placeholder location (ID = 0)
             const int UnknownLocationId = 0;
-            if (originId == -1) originId = UnknownLocationId;
-            if (locationId == -1) locationId = UnknownLocationId;
+            var originId = RickandMortyClient.ExtractIdFromUrl(c.Origin.Url) ?? UnknownLocationId;
+            var locationId = RickandMortyClient.ExtractIdFromUrl(c.Location.Url) ?? UnknownLocationId;
 
-            // Ensure the unknown placeholder exists if needed
+            // Ensure placeholder exists exactly once if referenced
             if ((originId == UnknownLocationId || locationId == UnknownLocationId) && !existingLocations.ContainsKey(UnknownLocationId))
             {
-                var unknownLoc = new Location
+                var existingUnknown = await _context.Locations.FindAsync(UnknownLocationId);
+                if (existingUnknown == null)
                 {
-                    Id = UnknownLocationId,
-                    Name = "unknown",
-                    Type = "unknown",
-                    Dimension = "unknown"
-                };
-                _context.Locations.Add(unknownLoc);
-                existingLocations[UnknownLocationId] = unknownLoc;
+                    existingUnknown = new Location
+                    {
+                        Id = UnknownLocationId,
+                        Name = "unknown",
+                        Type = "unknown",
+                        Dimension = "unknown"
+                    };
+                    _context.Locations.Add(existingUnknown);
+                }
+                existingLocations[UnknownLocationId] = existingUnknown;
             }
 
-            if (!existingLocations.ContainsKey(originId) && originId != UnknownLocationId)
+            // Add origin/location shells if not already tracked (will be updated later if API supplies details elsewhere)
+            if (originId != UnknownLocationId && !existingLocations.ContainsKey(originId))
             {
-                _context.Locations.Add(new Location
+                var originLoc = new Location
                 {
                     Id = originId,
                     Name = c.Origin.Name,
                     Type = "unknown",
                     Dimension = "unknown"
-                });
-                existingLocations[originId] = await _context.Locations.FindAsync(originId) ?? new Location { Id = originId };
+                };
+                _context.Locations.Add(originLoc);
+                existingLocations[originId] = originLoc;
             }
-            if (!existingLocations.ContainsKey(locationId) && locationId != UnknownLocationId)
+            if (locationId != UnknownLocationId && !existingLocations.ContainsKey(locationId))
             {
-                _context.Locations.Add(new Location
+                var currentLoc = new Location
                 {
                     Id = locationId,
                     Name = c.Location.Name,
                     Type = "unknown",
                     Dimension = "unknown"
-                });
-                existingLocations[locationId] = await _context.Locations.FindAsync(locationId) ?? new Location { Id = locationId };
+                };
+                _context.Locations.Add(currentLoc);
+                existingLocations[locationId] = currentLoc;
             }
 
             if (!existingCharacters.TryGetValue(c.Id, out var character))
             {
-                character = new Character
-                {
-                    Id = c.Id,
-                };
+                character = new Character { Id = c.Id };
                 _context.Characters.Add(character);
                 existingCharacters[c.Id] = character;
             }

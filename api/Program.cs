@@ -1,5 +1,6 @@
 using api.Data;
 using api.Services;
+using api.Entities;
 using api.Services.Background;
 using api.Services.Enrichment;
 using api.Services.RickandMorty;
@@ -38,6 +39,17 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Seed placeholder entities (idempotent)
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    if (!db.Locations.Any(l => l.Id == 0))
+    {
+        db.Locations.Add(new Location { Id = 0, Name = "unknown", Type = "unknown", Dimension = "unknown" });
+        db.SaveChanges();
+    }
+}
 
 app.MapControllers();
 

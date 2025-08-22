@@ -45,7 +45,7 @@ public class UploadHistoryController : ControllerBase
     }
 
     /// <summary>
-    /// Upload the CSV, save to disk, create UploadHistory and enqueue background process
+    /// Upload the CSV, save to disk, create UploadHistory object in DB, and enqueue background process
     /// </summary>
     [HttpPost]
     [Consumes("multipart/form-data")]
